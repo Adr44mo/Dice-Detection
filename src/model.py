@@ -1,0 +1,139 @@
+"""
+Model definitions for dice detection
+Uses Faster R-CNN with pretrained backbone
+"""
+
+import torch
+import torchvision
+from torchvision.models.detection import FasterRCNN
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from torchvision.models.detection.rpn import AnchorGenerator
+from typing import Optional
+
+
+def get_fasterrcnn_model(
+    num_classes: int,
+    pretrained: bool = True,
+    trainable_backbone_layers: int = 3,
+    min_size: int = 800,
+    max_size: int = 1333
+) -> FasterRCNN:
+    """
+    Get Faster R-CNN model with ResNet50-FPN backbone
+    
+    Args:
+        num_classes: Number of classes (including background)
+        pretrained: Use pretrained weights for backbone
+        trainable_backbone_layers: Number of trainable backbone layers (0-5)
+        min_size: Minimum image size for training
+        max_size: Maximum image size for training
+        
+    Returns:
+        Faster R-CNN model
+    """
+    # Load pretrained model
+    model = torchvision.models.detection.fasterrcnn_resnet50_fpn(
+        weights="DEFAULT" if pretrained else None,
+        trainable_backbone_layers=trainable_backbone_layers,
+        min_size=min_size,
+        max_size=max_size
+    )
+    
+    # Replace the classifier head
+    in_features = model.roi_heads.box_predictor.cls_score.in_features
+    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    
+    return model
+
+
+def get_fasterrcnn_mobilenet(
+    num_classes: int,
+    pretrained: bool = True,
+    trainable_backbone_layers: int = 3,
+    min_size: int = 800,
+    max_size: int = 1333
+) -> FasterRCNN:
+    """
+    Get Faster R-CNN model with MobileNetV3 backbone (lighter and faster)
+    
+    Args:
+        num_classes: Number of classes (including background)
+        pretrained: Use pretrained weights for backbone
+        trainable_backbone_layers: Number of trainable backbone layers
+        min_size: Minimum image size for training
+        max_size: Maximum image size for training
+        
+    Returns:
+        Faster R-CNN model with MobileNet backbone
+    """
+    model = torchvision.models.detection.fasterrcnn_mobilenet_v3_large_fpn(
+        weights="DEFAULT" if pretrained else None,
+        trainable_backbone_layers=trainable_backbone_layers,
+        min_size=min_size,
+        max_size=max_size
+    )
+    
+    # Replace the classifier head
+    in_features = model.roi_heads.box_predictor.cls_score.in_features
+    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    
+    return model
+
+
+def load_model_checkpoint(
+    model: torch.nn.Module,
+    checkpoint_path: str,
+    device: str = "cuda"
+) -> torch.nn.Module:
+    """
+    Load model from checkpoint
+    
+    Args:
+        model: Model instance
+        checkpoint_path: Path to checkpoint file
+        device: Device to load model on
+        
+    Returns:
+        Model with loaded weights
+    """
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    
+    if 'model_state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['model_state_dict'])
+    else:
+        model.load_state_dict(checkpoint)
+    
+    return model
+
+
+def save_model_checkpoint(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    epoch: int,
+    loss: float,
+    filepath: str,
+    additional_info: Optional[dict] = None
+):
+    """
+    Save model checkpoint
+    
+    Args:
+        model: Model to save
+        optimizer: Optimizer state
+        epoch: Current epoch
+        loss: Current loss
+        filepath: Path to save checkpoint
+        additional_info: Additional information to save
+    """
+    checkpoint = {
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': loss,
+    }
+    
+    if additional_info:
+        checkpoint.update(additional_info)
+    
+    torch.save(checkpoint, filepath)
+    print(f"Checkpoint saved to {filepath}")
