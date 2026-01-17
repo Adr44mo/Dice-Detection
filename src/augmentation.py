@@ -11,6 +11,11 @@ from PIL import Image, ImageDraw
 import torchvision.transforms.functional as F
 from typing import List, Tuple, Dict
 
+# Import new augmentation modules
+from .aug.annotation_manager import AnnotationManager
+from .aug.difficulty_sampling import DifficultyAwareSampler, calculate_instance_difficulty
+from .aug.copy_paste import CopyPasteAugmentation, MosaicWithCopyPaste
+
 
 class ClassAwareSampler(Sampler):
     """
