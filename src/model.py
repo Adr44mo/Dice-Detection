@@ -1,3 +1,5 @@
+from src import config as cfg
+from src.Loss_function import RoIHeadsWithFocalLoss
 """
 Model definitions for dice detection
 Uses Faster R-CNN with pretrained backbone
@@ -16,7 +18,10 @@ def get_fasterrcnn_model(
     pretrained: bool = True,
     trainable_backbone_layers: int = 3,
     min_size: int = 800,
-    max_size: int = 1333
+    max_size: int = 1333,
+    use_focal_loss: bool = False,
+    alpha: float = 0.25,
+    gamma: float = 2.0
 ) -> FasterRCNN:
     """
     Get Faster R-CNN model with ResNet50-FPN backbone
@@ -42,7 +47,25 @@ def get_fasterrcnn_model(
     # Replace the classifier head
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-    
+
+    if use_focal_loss:
+        rh = model.roi_heads
+        model.roi_heads = RoIHeadsWithFocalLoss(
+            box_roi_pool=rh.box_roi_pool,
+            box_head=rh.box_head,
+            box_predictor=rh.box_predictor,
+            fg_iou_thresh=0.5,
+            bg_iou_thresh=0.5,
+            batch_size_per_image=cfg.BATCH_SIZE * 32 if hasattr(cfg, 'BATCH_SIZE') else 512,
+            positive_fraction=0.25,
+            bbox_reg_weights=None,
+            score_thresh=cfg.CONFIDENCE_THRESHOLD if hasattr(cfg, 'CONFIDENCE_THRESHOLD') else 0.05,
+            nms_thresh=0.5,
+            detections_per_img=100,
+            alpha=alpha,
+            gamma=gamma
+        )
+
     return model
 
 
@@ -51,7 +74,10 @@ def get_fasterrcnn_mobilenet(
     pretrained: bool = True,
     trainable_backbone_layers: int = 3,
     min_size: int = 800,
-    max_size: int = 1333
+    max_size: int = 1333,
+    use_focal_loss: bool = False,
+    alpha: float = 0.25,
+    gamma: float = 2.0
 ) -> FasterRCNN:
     """
     Get Faster R-CNN model with MobileNetV3 backbone (lighter and faster)
@@ -76,7 +102,25 @@ def get_fasterrcnn_mobilenet(
     # Replace the classifier head
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-    
+
+    if use_focal_loss:
+        rh = model.roi_heads
+        model.roi_heads = RoIHeadsWithFocalLoss(
+            box_roi_pool=rh.box_roi_pool,
+            box_head=rh.box_head,
+            box_predictor=rh.box_predictor,
+            fg_iou_thresh=0.5,
+            bg_iou_thresh=0.5,
+            batch_size_per_image=cfg.BATCH_SIZE * 32 if hasattr(cfg, 'BATCH_SIZE') else 512,
+            positive_fraction=0.25,
+            bbox_reg_weights=None,
+            score_thresh=cfg.CONFIDENCE_THRESHOLD if hasattr(cfg, 'CONFIDENCE_THRESHOLD') else 0.05,
+            nms_thresh=0.5,
+            detections_per_img=100,
+            alpha=alpha,
+            gamma=gamma
+        )
+
     return model
 
 
