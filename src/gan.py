@@ -224,10 +224,13 @@ def create_synthetic_coco_dataset(
     config,
     device,
     class_counts=None,
-    latent_dim=100
+    latent_dim=100,
+    original_annotations=None,
+    original_image_dir=None
 ):
     """
     Generate a complete COCO-format dataset with synthetic dice scenes.
+    Can optionally merge with existing annotations and avoid overlapping with existing dice.
     
     Args:
         generator: Trained Generator model
@@ -238,9 +241,12 @@ def create_synthetic_coco_dataset(
             - dice_size_range: Tuple (min_size, max_size) for dice
             - dice_per_image: Tuple (min_dice, max_dice) per scene
             - num_images: Number of scenes to generate
+            - merge_with_original: If True, merge with original annotations
         device: Torch device
         class_counts: Dict of current class counts to balance (optional)
         latent_dim: Dimension of latent noise vector
+        original_annotations: Original COCO annotations to merge with (optional)
+        original_image_dir: Directory with original images (optional)
         
     Returns:
         Dictionary with 'images', 'annotations', and 'categories' generated
@@ -257,6 +263,33 @@ def create_synthetic_coco_dataset(
     coco_annotations = []
     coco_categories = [{'id': i, 'name': str(i)} for i in range(1, 7)]
     
+    merge_with_original = config.get('merge_with_original', False)
+    
+    # If merging with original, copy original data first
+    if merge_with_original and original_annotations and original_image_dir:
+        print("Merging with original annotations...")
+        
+        # Copy original images to output directory
+        for img_info in original_annotations['images']:
+            src_path = os.path.join(original_image_dir, img_info['file_name'])
+            dst_path = os.path.join(output_dir, 'train', img_info['file_name'])
+            if os.path.exists(src_path):
+                import shutil
+                shutil.copy2(src_path, dst_path)
+        
+        # Copy original annotations
+        coco_images = original_annotations['images'].copy()
+        coco_annotations = original_annotations['annotations'].copy()
+        
+        # Find max IDs to continue from
+        image_id = max([img['id'] for img in coco_images], default=0) + 1
+        annotation_id = max([ann['id'] for ann in coco_annotations], default=0) + 1
+        
+        print(f"Starting from image_id={image_id}, annotation_id={annotation_id}")
+    else:
+        image_id = 1
+        annotation_id = 1
+    
     # Calculate target counts if class_counts provided
     if class_counts:
         target_count = max(class_counts.values())
@@ -264,84 +297,170 @@ def create_synthetic_coco_dataset(
     else:
         images_to_generate = {str(i): 0 for i in range(1, 7)}
     
-    image_id = 1
-    annotation_id = 1
     generated_per_class = {str(i): 0 for i in range(1, 7)}
     
     scene_size = config.get('scene_size', (640, 640))
     dice_size_range = config.get('dice_size_range', (60, 120))
     dice_per_image = config.get('dice_per_image', (1, 4))
     num_images = config.get('num_images', 100)
+    add_to_existing = config.get('add_to_existing_images', False)
     
     print(f"Generating {num_images} synthetic scenes...")
     
-    for scene_idx in tqdm(range(num_images)):
-        # Load random background and resize
-        bg_file = random.choice(background_files)
-        background = Image.open(os.path.join(background_dir, bg_file)).convert('RGB')
-        background = background.resize(scene_size, Image.LANCZOS)
-        scene = background.copy()
+    # If adding to existing images
+    if add_to_existing and original_annotations and original_image_dir:
+        print("Adding synthetic dice to existing images...")
         
-        # Determine number of dice
-        num_dice = random.randint(*dice_per_image)
+        # Build lookup of existing bounding boxes per image
+        existing_boxes_by_image = {}
+        for ann in original_annotations['annotations']:
+            img_id = ann['image_id']
+            if img_id not in existing_boxes_by_image:
+                existing_boxes_by_image[img_id] = []
+            x, y, w, h = ann['bbox']
+            existing_boxes_by_image[img_id].append([x, y, x + w, y + h])
         
-        # Prioritize underrepresented classes
-        if class_counts:
-            needed_classes = [k for k, v in images_to_generate.items() if generated_per_class[k] < v]
-            if not needed_classes:
-                needed_classes = [str(i) for i in range(1, 7)]
-        else:
-            needed_classes = [str(i) for i in range(1, 7)]
+        # Select random original images to augment
+        images_to_augment = random.sample(
+            original_annotations['images'], 
+            min(num_images, len(original_annotations['images']))
+        )
         
-        placed_boxes = []
-        scene_annotations = []
-        
-        for _ in range(num_dice):
-            # Select class
-            class_name = random.choice(needed_classes)
-            class_idx = int(class_name) - 1
-            
-            # Random dice size
-            dice_size = random.randint(*dice_size_range)
-            
-            # Try to place dice without overlap
-            max_attempts = 20
-            for attempt in range(max_attempts):
-                x = random.randint(0, scene_size[0] - dice_size)
-                y = random.randint(0, scene_size[1] - dice_size)
-                new_box = [x, y, x + dice_size, y + dice_size]
+        for img_info in tqdm(images_to_augment):
+            # Load original image
+            img_path = os.path.join(original_image_dir, img_info['file_name'])
+            if not os.path.exists(img_path):
+                continue
                 
-                if not check_overlap(new_box, placed_boxes):
-                    # Generate and paste dice
-                    dice_img = generate_dice_image(generator, class_idx, dice_size, device, latent_dim)
-                    scene.paste(dice_img, (x, y))
-                    
-                    placed_boxes.append(new_box)
-                    scene_annotations.append({
-                        'id': annotation_id,
-                        'image_id': image_id,
-                        'category_id': int(class_name),
-                        'bbox': [x, y, dice_size, dice_size],  # COCO format: x, y, w, h
-                        'area': dice_size * dice_size,
-                        'iscrowd': 0
-                    })
-                    annotation_id += 1
-                    generated_per_class[class_name] += 1
-                    break
-        
-        if scene_annotations:
-            # Save image
-            img_filename = f"synthetic_{image_id:05d}.jpg"
-            scene.save(os.path.join(output_dir, 'train', img_filename))
+            scene = Image.open(img_path).convert('RGB')
+            scene = scene.resize(scene_size, Image.LANCZOS)
             
-            coco_images.append({
-                'id': image_id,
-                'file_name': img_filename,
-                'width': scene_size[0],
-                'height': scene_size[1]
-            })
-            coco_annotations.extend(scene_annotations)
-            image_id += 1
+            # Get existing boxes for this image
+            existing_boxes = existing_boxes_by_image.get(img_info['id'], [])
+            
+            # Determine number of dice to add
+            num_dice = random.randint(*dice_per_image)
+            
+            # Prioritize underrepresented classes
+            if class_counts:
+                needed_classes = [k for k, v in images_to_generate.items() if generated_per_class[k] < v]
+                if not needed_classes:
+                    needed_classes = [str(i) for i in range(1, 7)]
+            else:
+                needed_classes = [str(i) for i in range(1, 7)]
+            
+            placed_boxes = existing_boxes.copy()
+            new_annotations = []
+            
+            for _ in range(num_dice):
+                # Select class
+                class_name = random.choice(needed_classes)
+                class_idx = int(class_name) - 1
+                
+                # Random dice size
+                dice_size = random.randint(*dice_size_range)
+                
+                # Try to place dice without overlap (with EXISTING dice)
+                max_attempts = 30
+                for attempt in range(max_attempts):
+                    x = random.randint(0, scene_size[0] - dice_size)
+                    y = random.randint(0, scene_size[1] - dice_size)
+                    new_box = [x, y, x + dice_size, y + dice_size]
+                    
+                    # Check overlap with ALL boxes (existing + newly placed)
+                    if not check_overlap(new_box, placed_boxes, min_distance=15):
+                        # Generate and paste dice
+                        dice_img = generate_dice_image(generator, class_idx, dice_size, device, latent_dim)
+                        scene.paste(dice_img, (x, y))
+                        
+                        placed_boxes.append(new_box)
+                        new_annotations.append({
+                            'id': annotation_id,
+                            'image_id': img_info['id'],
+                            'category_id': int(class_name),
+                            'bbox': [x, y, dice_size, dice_size],
+                            'area': dice_size * dice_size,
+                            'iscrowd': 0
+                        })
+                        annotation_id += 1
+                        generated_per_class[class_name] += 1
+                        break
+            
+            if new_annotations:
+                # Save augmented image (overwrite original in output dir)
+                output_path = os.path.join(output_dir, 'train', img_info['file_name'])
+                scene.save(output_path)
+                coco_annotations.extend(new_annotations)
+    
+    else:
+        # Generate completely new synthetic scenes
+        for scene_idx in tqdm(range(num_images)):
+            # Load random background and resize
+            bg_file = random.choice(background_files)
+            background = Image.open(os.path.join(background_dir, bg_file)).convert('RGB')
+            background = background.resize(scene_size, Image.LANCZOS)
+            scene = background.copy()
+            
+            # Determine number of dice
+            num_dice = random.randint(*dice_per_image)
+            
+            # Prioritize underrepresented classes
+            if class_counts:
+                needed_classes = [k for k, v in images_to_generate.items() if generated_per_class[k] < v]
+                if not needed_classes:
+                    needed_classes = [str(i) for i in range(1, 7)]
+            else:
+                needed_classes = [str(i) for i in range(1, 7)]
+            
+            placed_boxes = []
+            scene_annotations = []
+            
+            for _ in range(num_dice):
+                # Select class
+                class_name = random.choice(needed_classes)
+                class_idx = int(class_name) - 1
+                
+                # Random dice size
+                dice_size = random.randint(*dice_size_range)
+                
+                # Try to place dice without overlap
+                max_attempts = 20
+                for attempt in range(max_attempts):
+                    x = random.randint(0, scene_size[0] - dice_size)
+                    y = random.randint(0, scene_size[1] - dice_size)
+                    new_box = [x, y, x + dice_size, y + dice_size]
+                    
+                    if not check_overlap(new_box, placed_boxes):
+                        # Generate and paste dice
+                        dice_img = generate_dice_image(generator, class_idx, dice_size, device, latent_dim)
+                        scene.paste(dice_img, (x, y))
+                        
+                        placed_boxes.append(new_box)
+                        scene_annotations.append({
+                            'id': annotation_id,
+                            'image_id': image_id,
+                            'category_id': int(class_name),
+                            'bbox': [x, y, dice_size, dice_size],
+                            'area': dice_size * dice_size,
+                            'iscrowd': 0
+                        })
+                        annotation_id += 1
+                        generated_per_class[class_name] += 1
+                        break
+            
+            if scene_annotations:
+                # Save image
+                img_filename = f"synthetic_{image_id:05d}.jpg"
+                scene.save(os.path.join(output_dir, 'train', img_filename))
+                
+                coco_images.append({
+                    'id': image_id,
+                    'file_name': img_filename,
+                    'width': scene_size[0],
+                    'height': scene_size[1]
+                })
+                coco_annotations.extend(scene_annotations)
+                image_id += 1
     
     # Save COCO annotations
     coco_data = {
@@ -353,8 +472,8 @@ def create_synthetic_coco_dataset(
     with open(os.path.join(output_dir, 'train', '_annotations.coco.json'), 'w') as f:
         json.dump(coco_data, f, indent=2)
     
-    print(f"\n✅ Generated {len(coco_images)} images with {len(coco_annotations)} annotations")
-    print(f"\nPer-class generation counts:")
+    print(f"\n✅ Generated dataset with {len(coco_images)} total images and {len(coco_annotations)} total annotations")
+    print(f"\nSynthetic dice added per class:")
     for k, v in generated_per_class.items():
         print(f"  Class {k}: {v} dice")
     
