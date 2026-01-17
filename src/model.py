@@ -1,5 +1,4 @@
-from src import config as cfg
-from src.Loss_function import RoIHeadsWithFocalLoss
+
 """
 Model definitions for dice detection
 Uses Faster R-CNN with pretrained backbone
@@ -11,6 +10,8 @@ from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.rpn import AnchorGenerator
 from typing import Optional
+from src import config as cfg
+from src.Loss_function import RoIHeadsWithFocalLoss
 
 
 def get_fasterrcnn_model(

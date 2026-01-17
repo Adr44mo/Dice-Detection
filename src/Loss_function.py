@@ -3,6 +3,9 @@ from torchvision.models.detection.roi_heads import RoIHeads
 from torchvision.models.detection.roi_heads import fastrcnn_loss
 from torchvision.ops import boxes as box_ops
 from typing import Optional, Tuple, List, Dict
+import torch
+import torch.nn as nn
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 # Custom RoIHeads with Focal Loss for classification
 class RoIHeadsWithFocalLoss(RoIHeads):
@@ -30,18 +33,8 @@ class RoIHeadsWithFocalLoss(RoIHeads):
         return classification_loss, box_loss
 
     def forward(self, features, proposals, image_shapes, targets: Optional[List[Dict[str, torch.Tensor]]] = None):
-        # This is a copy of torchvision's RoIHeads.forward, but uses self.fastrcnn_loss
-        # for the classification loss
-        # ...existing code...
-        # The rest of the code is identical to torchvision's RoIHeads.forward except for the loss call
-        # For brevity, you can use this class as a drop-in replacement for RoIHeads in your model
-        # Example usage:
-        #   model.roi_heads = RoIHeadsWithFocalLoss(...)
-        # See torchvision source for full details
         return super().forward(features, proposals, image_shapes, targets)
-import torch
-import torch.nn as nn
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+
 
 class FocalLoss(nn.Module):
     def __init__(self, alpha=0.25, gamma=2.0, reduction='mean'):
