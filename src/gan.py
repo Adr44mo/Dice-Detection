@@ -253,6 +253,7 @@ def create_synthetic_coco_dataset(
         Dictionary with 'images', 'annotations', and 'categories' generated
     """
     os.makedirs(os.path.join(output_dir, split), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, 'annotations'), exist_ok=True)
     
     # Load backgrounds
     background_files = [f for f in os.listdir(background_dir) if f.endswith(('.jpg', '.png'))]
@@ -470,10 +471,12 @@ def create_synthetic_coco_dataset(
         'categories': coco_categories
     }
     
-    with open(os.path.join(output_dir, split, '_annotations.coco.json'), 'w') as f:
+    annotation_path = os.path.join(output_dir, 'annotations', f'{split}.coco.json')
+    with open(annotation_path, 'w') as f:
         json.dump(coco_data, f, indent=2)
     
     print(f"\n✅ Generated dataset with {len(coco_images)} total images and {len(coco_annotations)} total annotations")
+    print(f"   Annotations saved to: {annotation_path}")
     print(f"\nSynthetic dice added per class:")
     for k, v in generated_per_class.items():
         print(f"  Class {k}: {v} dice")
