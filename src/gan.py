@@ -204,17 +204,16 @@ def extract_backgrounds(image_dir, output_dir, num_backgrounds=50):
     """
     os.makedirs(output_dir, exist_ok=True)
     
-    bg_count = 0
-    for img_file in os.listdir(image_dir):
-        if img_file.endswith(('.jpg', '.png', '.jpeg')):
-            img_path = os.path.join(image_dir, img_file)
-            img = Image.open(img_path).convert('RGB')
-            img.save(os.path.join(output_dir, f'bg_{bg_count:04d}.jpg'))
-            bg_count += 1
-            if bg_count >= num_backgrounds:
-                break
+    image_files = [f for f in os.listdir(image_dir) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
+    # Randomly sample images to use as backgrounds
+    selected_files = random.sample(image_files, min(len(image_files), num_backgrounds))
     
-    return bg_count
+    for i, img_file in enumerate(selected_files):
+        img_path = os.path.join(image_dir, img_file)
+        img = Image.open(img_path).convert('RGB')
+        img.save(os.path.join(output_dir, f'bg_{i:04d}.jpg'))
+    
+    return len(selected_files)
 
 
 def create_synthetic_coco_dataset(
@@ -226,7 +225,8 @@ def create_synthetic_coco_dataset(
     class_counts=None,
     latent_dim=100,
     original_annotations=None,
-    original_image_dir=None
+    original_image_dir=None,
+    split='train'
 ):
     """
     Generate a complete COCO-format dataset with synthetic dice scenes.
@@ -247,11 +247,12 @@ def create_synthetic_coco_dataset(
         latent_dim: Dimension of latent noise vector
         original_annotations: Original COCO annotations to merge with (optional)
         original_image_dir: Directory with original images (optional)
+        split: Split name ('train', 'val', 'test') for subdirectory
         
     Returns:
         Dictionary with 'images', 'annotations', and 'categories' generated
     """
-    os.makedirs(os.path.join(output_dir, 'train'), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, split), exist_ok=True)
     
     # Load backgrounds
     background_files = [f for f in os.listdir(background_dir) if f.endswith(('.jpg', '.png'))]
@@ -272,7 +273,7 @@ def create_synthetic_coco_dataset(
         # Copy original images to output directory
         for img_info in original_annotations['images']:
             src_path = os.path.join(original_image_dir, img_info['file_name'])
-            dst_path = os.path.join(output_dir, 'train', img_info['file_name'])
+            dst_path = os.path.join(output_dir, split, img_info['file_name'])
             if os.path.exists(src_path):
                 import shutil
                 shutil.copy2(src_path, dst_path)
@@ -388,7 +389,7 @@ def create_synthetic_coco_dataset(
             
             if new_annotations:
                 # Save augmented image (overwrite original in output dir)
-                output_path = os.path.join(output_dir, 'train', img_info['file_name'])
+                output_path = os.path.join(output_dir, split, img_info['file_name'])
                 scene.save(output_path)
                 coco_annotations.extend(new_annotations)
     
@@ -451,7 +452,7 @@ def create_synthetic_coco_dataset(
             if scene_annotations:
                 # Save image
                 img_filename = f"synthetic_{image_id:05d}.jpg"
-                scene.save(os.path.join(output_dir, 'train', img_filename))
+                scene.save(os.path.join(output_dir, split, img_filename))
                 
                 coco_images.append({
                     'id': image_id,
@@ -469,7 +470,7 @@ def create_synthetic_coco_dataset(
         'categories': coco_categories
     }
     
-    with open(os.path.join(output_dir, 'train', '_annotations.coco.json'), 'w') as f:
+    with open(os.path.join(output_dir, split, '_annotations.coco.json'), 'w') as f:
         json.dump(coco_data, f, indent=2)
     
     print(f"\n✅ Generated dataset with {len(coco_images)} total images and {len(coco_annotations)} total annotations")
