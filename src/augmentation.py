@@ -1,6 +1,5 @@
 """
-Data augmentation techniques for dice detection
-Includes class-aware sampling and mosaic augmentation
+Data augmentation techniques for dice detection.
 """
 
 import random
@@ -11,17 +10,8 @@ from PIL import Image, ImageDraw
 import torchvision.transforms.functional as F
 from typing import List, Tuple, Dict
 
-# Import new augmentation modules
-from .aug.annotation_manager import AnnotationManager
-from .aug.difficulty_sampling import DifficultyAwareSampler, calculate_instance_difficulty
-from .aug.copy_paste import CopyPasteAugmentation, MosaicWithCopyPaste
-
-
 class ClassAwareSampler(Sampler):
-    """
-    Sampler that balances classes during training
-    Samples images based on their class distribution
-    """
+    """Sampler that balances classes during training."""
     
     def __init__(
         self, 
@@ -81,10 +71,7 @@ class ClassAwareSampler(Sampler):
 
 
 class MosaicAugmentation:
-    """
-    Mosaic augmentation: combines 4 images into a 2x2 grid
-    Increases diversity of object scales and contexts
-    """
+    """Combines 4 images into a 2x2 grid mosaic."""
     
     def __init__(
         self,

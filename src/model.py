@@ -1,7 +1,5 @@
-
 """
-Model definitions for dice detection
-Uses Faster R-CNN with pretrained backbone
+Model definitions for dice detection using Faster R-CNN.
 """
 
 import torch
@@ -25,7 +23,7 @@ def get_fasterrcnn_model(
     gamma: float = 2.0
 ) -> FasterRCNN:
     """
-    Get Faster R-CNN model with ResNet50-FPN backbone
+    Get Faster R-CNN model with ResNet50-FPN backbone.
     
     Args:
         num_classes: Number of classes (including background)
@@ -33,11 +31,13 @@ def get_fasterrcnn_model(
         trainable_backbone_layers: Number of trainable backbone layers (0-5)
         min_size: Minimum image size for training
         max_size: Maximum image size for training
+        use_focal_loss: Enable focal loss for class imbalance
+        alpha: Focal loss alpha parameter
+        gamma: Focal loss gamma parameter
         
     Returns:
         Faster R-CNN model
     """
-    # Load pretrained model
     model = torchvision.models.detection.fasterrcnn_resnet50_fpn(
         weights="DEFAULT" if pretrained else None,
         trainable_backbone_layers=trainable_backbone_layers,
@@ -45,7 +45,6 @@ def get_fasterrcnn_model(
         max_size=max_size
     )
     
-    # Replace the classifier head
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
@@ -81,7 +80,7 @@ def get_fasterrcnn_mobilenet(
     gamma: float = 2.0
 ) -> FasterRCNN:
     """
-    Get Faster R-CNN model with MobileNetV3 backbone (lighter and faster)
+    Get Faster R-CNN model with MobileNetV3 backbone.
     
     Args:
         num_classes: Number of classes (including background)
@@ -89,6 +88,9 @@ def get_fasterrcnn_mobilenet(
         trainable_backbone_layers: Number of trainable backbone layers
         min_size: Minimum image size for training
         max_size: Maximum image size for training
+        use_focal_loss: Enable focal loss for class imbalance
+        alpha: Focal loss alpha parameter
+        gamma: Focal loss gamma parameter
         
     Returns:
         Faster R-CNN model with MobileNet backbone
@@ -100,7 +102,6 @@ def get_fasterrcnn_mobilenet(
         max_size=max_size
     )
     
-    # Replace the classifier head
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 

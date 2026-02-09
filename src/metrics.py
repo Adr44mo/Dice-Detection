@@ -1,6 +1,5 @@
 """
-Evaluation metrics for object detection
-Implements mAP (mean Average Precision) calculation
+Evaluation metrics for object detection including mAP calculation.
 """
 
 import torch
