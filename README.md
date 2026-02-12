@@ -1,133 +1,95 @@
 # Dice Detection
 
-A comprehensive implementation of dice detection using Faster R-CNN with data augmentation techniques and class imbalance handling strategies.
+Faster R-CNN with ResNet50-FPN for detecting Yahtzee dice while studying long-tailed data, augmentation, and GAN-based synthesis.
 
-## Overview
-
-This project implements an object detection system for detecting and classifying dice in images. The system uses Faster R-CNN with either ResNet50 or MobileNetV3 backbone and includes several features:
-
-- Multiple data augmentation strategies (mosaic, copy-paste, random transforms)
-- Class-aware and difficulty-aware sampling for handling imbalanced datasets
-- Focal loss implementation for improved class imbalance handling
-- GAN-based synthetic data generation
-- Comprehensive evaluation metrics
-- Flexible training and inference pipelines
-
-## Project Structure
+## Repository Layout
 
 ```
 Dice-Detection/
-├── src/                          # Core source code
-│   ├── augmentation.py          # Augmentation strategies
-│   ├── config.py                # Configuration settings
-│   ├── dataset.py               # Dataset loading
-│   ├── gan.py                   # GAN implementation
-│   ├── Loss_function.py         # Focal loss implementation
-│   ├── metrics.py               # Evaluation metrics
-│   ├── model.py                 # Model definitions
-│   ├── training.py              # Training utilities
-│   ├── visualization.py         # Visualization tools
-│   └── aug/                     # Advanced augmentation modules
-│       ├── annotation_manager.py
-│       ├── copy_paste.py
-│       └── difficulty_sampling.py
-├── notebook/                     # Jupyter notebooks (main entry point)
-│   ├── augmentation_comparison.ipynb  # Training pipeline
-│   └── GAN.ipynb                      # GAN data generation
-├── Annotations/                  # COCO format annotation files
-├── doc/                          # Documentation and guides
-└── results/                      # Training results and metrics
+├── Annotations/                 # COCO-format label files used across experiments
+├── checkpoints/                 # Saved .pth models referenced in the paper
+├── notebook/                    # Colab-ready experiment notebooks (training, ablations, GAN)
+├── scripts/                     # Small CLI utilities (dataset download, checkpoint eval)
+└── src/                         # Python modules (datasets, models, losses, augmentation, metrics)
 ```
 
-## Installation
+## Getting Started
 
-### Requirements
+1. Clone the project
+   ```bash
+   git clone https://github.com/Adr44mo/Dice-Detection.git
+   cd Dice-Detection
+   ```
+2. (Optional) Create a virtual environment
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   ```
+3. Install the Python dependencies
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-- Python 3.8+
-- PyTorch 1.12+
-- CUDA 11.3+ (for GPU training)
+`requirements.txt` keeps the dependency list minimal (PyTorch, torchvision, roboflow, matplotlib, seaborn, tqdm, numpy, Pillow) so the same environment works for both notebooks and scripts.
 
-### Setup
+## Downloading the Dataset (scripts/download_roboflow_dataset.py)
 
-1. Clone the repository:
+Use the download script when you prefer a reproducible CLI alternative to the notebook cells. Set your Roboflow API key and run:
+
 ```bash
-git clone https://github.com/yourusername/Dice-Detection.git
-cd Dice-Detection
+export ROBOFLOW_API_KEY="your_key"
+python scripts/download_roboflow_dataset.py
 ```
 
-2. Install dependencies:
-```bash
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-pip install roboflow matplotlib seaborn tqdm numpy pillow
-```
+Defaults:
 
-3. Download the dataset using Roboflow or prepare your own COCO-format dataset.
+- Workspace: `workspace-spezm`
+- Project: `dice-0sexk`
+- Version: `2`
+- Format: `coco`
+- Destination: `./dice-2`
 
-## Usage
+The script refuses to overwrite a non-empty target directory, so either delete `dice-2/` or change `OUTPUT_DIR` before redownloading. Adjust the configuration block at the top of the script if you need a different Roboflow project, export format, or version.
 
-This project uses Jupyter notebooks for training and experimentation. The notebooks provide an interactive environment for configuring augmentation strategies, training models, and evaluating results.
+## Training and Experimentation (Notebooks)
 
-### Main Notebooks
+- `notebook/Dataset_Creation.ipynb`: builds balanced vs Zipfian splits and exports COCO annotations.
+- `notebook/augmentation_comparison.ipynb`: main training workflow with toggles for sampling methods, mosaic, random aug, focal loss, etc.
+- `notebook/GAN.ipynb`: trains the conditional DCGAN and prepares synthetic dice crops/background composites.
+- `notebook/6_gan_dataset_training.ipynb`: fine-tunes Faster R-CNN on GAN-augmented datasets and logs results.
 
-1. **`notebook/augmentation_comparison.ipynb`**: Complete training pipeline
-   - Load and prepare datasets with custom annotations
-   - Configure augmentation strategies (mosaic, copy-paste, random transforms)
-   - Enable class-aware or difficulty-aware sampling
-   - Train Faster R-CNN models with optional focal loss
-   - Evaluate performance with mAP metrics
-   - Visualize predictions and training history
+Each notebook exposes simple boolean flags or probability sliders so you can rerun the ablations published in `results/`. All notebooks expect the dataset folders produced by either Roboflow or the download script above.
 
-2. **`notebook/GAN.ipynb`**: GAN-based data generation
-   - Train conditional DCGAN on dice crops
-   - Generate synthetic dice images
-   - Create augmented training sets
+## Evaluating Checkpoints (scripts/eval_checkpoint_map.py)
 
-### Workflow
+`scripts/eval_checkpoint_map.py` computes mAP@0.5 on any COCO-formatted split without touching a notebook:
 
-1. Open the augmentation comparison notebook
-2. Configure your training settings (augmentation, sampling, loss function)
-3. Load your annotation files from the `Annotations/` directory
-4. Run training cells to train the model
-5. Evaluate and visualize results
+1. Edit the configuration block at the top of the script:
+   - `CHECKPOINT_PATH`: path to the `.pth` file you want to score (e.g. `checkpoints/DA_MA_RA.pth`).
+   - `DATASET_ROOT`: directory containing the images for the split (`dice-2/test` by default).
+   - `ANNOTATION_FILE`: filename of the COCO JSON inside that folder.
+   - `CUSTOM_ANNOTATION_PATH`: optional JSON copied into the dataset folder before evaluation (handy for balanced test sets).
+2. Run the script:
+   ```bash
+   python scripts/eval_checkpoint_map.py
+   ```
 
-## Features
+The script automatically:
 
-### Data Augmentation
+- Copies the requested annotation JSON into the dataset folder when `USE_CUSTOM_ANNOTATION` is `True`.
+- Infers how many classes the checkpoint was trained on by reading `roi_heads.box_predictor.cls_score.weight`. If the dataset metadata disagrees, the checkpoint value wins and a message is printed.
+- Builds the ResNet50-FPN model, loads the checkpoint, and reports overall mAP plus per-class AP using the pure-PyTorch evaluator in `src/metrics.py`.
 
-1. **Mosaic Augmentation**: Combines 4 images into a 2x2 grid, increasing diversity of object scales and contexts.
+Set `OUTPUT_JSON` if you want the metrics persisted to disk.
 
-2. **Copy-Paste Augmentation**: Extracts dice instances from source images and intelligently pastes them onto target images with edge blending.
+## Source Modules
 
-3. **Random Augmentations**: Standard augmentations including horizontal flipping, color jitter, brightness/contrast adjustments.
+- `src/dataset.py`: COCO dataset loader with torchvision-style targets and custom `collate_fn`.
+- `src/model.py`: Faster R-CNN factory (ResNet50-FPN) plus checkpoint save/load helpers and focal-loss RoI heads.
+- `src/augmentation.py` and `src/aug/`: mosaic, copy-paste, annotation management, and difficulty-aware sampling utilities.
+- `src/Loss_function.py`: implementation of focal loss used to reweight RoI heads.
+- `src/training.py`: epoch loops, optimizer/scheduler helpers, and logging utilities for the notebooks.
+- `src/metrics.py`: IoU, AP, and mAP calculation used by both notebooks and the evaluation script.
 
-### Sampling Strategies
-
-1. **Class-Aware Sampling**: Balances training by oversampling underrepresented classes.
-
-2. **Difficulty-Aware Sampling**: Prioritizes harder examples based on:
-   - Object size (smaller objects are harder)
-   - Edge proximity (objects near edges may be cut off)
-   - Density and occlusion (overlapping objects)
-
-### Loss Functions
-
-1. **Standard Cross-Entropy**: Default classification loss in Faster R-CNN.
-
-2. **Focal Loss**: Addresses class imbalance by down-weighting easy examples and focusing on hard negatives.
-
-### Model Architectures
-
-1. **Faster R-CNN with ResNet50-FPN**: Standard architecture with strong performance.
-
-2. **Faster R-CNN with MobileNetV3**: Lighter and faster variant suitable for resource-constrained environments.
-
-## Results
-
-Model performance is evaluated using:
-- **mAP (mean Average Precision)**: Primary metric at IoU threshold 0.5
-- **Per-class AP**: Individual class performance
-- **Training history**: Loss curves over epochs
-
-Results are saved to the `results/` directory in JSON format.
 
 
