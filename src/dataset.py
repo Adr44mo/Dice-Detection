@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset
 from PIL import Image
 import torchvision.transforms as T
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, Tuple, Optional
 
 
 class DiceDetectionDataset(Dataset):

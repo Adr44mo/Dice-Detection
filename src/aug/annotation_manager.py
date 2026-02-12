@@ -8,10 +8,9 @@ This module provides utilities to:
 - Provide metadata about available datasets
 """
 
-import os
 import json
-from typing import Dict, List, Optional, Tuple
 from pathlib import Path
+from typing import Dict, Optional
 
 
 class AnnotationManager:

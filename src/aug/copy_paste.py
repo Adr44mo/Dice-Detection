@@ -1,18 +1,5 @@
-"""
-Instance-Level Copy-Paste Augmentation for dice detection.
-
-This module implements copy-paste augmentation that extracts individual dice
-instances from source images and pastes them onto target images with:
-- Intelligent placement (avoiding overlaps)
-- Optional transformations (rotation, scaling)
-- Edge blending for natural appearance
-- Proper annotation handling
-
-Can be used standalone or combined with mosaic augmentation.
-"""
-
 import random
-import numpy as np
+
 import torch
 from torch.utils.data import Dataset
 from PIL import Image, ImageFilter, ImageEnhance

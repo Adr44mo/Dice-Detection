@@ -2,9 +2,10 @@
 Training utilities for dice detection
 """
 
-import torch
 import time
-from typing import Dict, List, Tuple, Optional
+from typing import Dict
+
+import torch
 from tqdm import tqdm
 
 

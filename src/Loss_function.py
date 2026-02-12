@@ -1,11 +1,8 @@
-from typing import Optional, List, Dict
-from torchvision.models.detection.roi_heads import RoIHeads
-from torchvision.models.detection.roi_heads import fastrcnn_loss
-from torchvision.ops import boxes as box_ops
-from typing import Optional, Tuple, List, Dict
+from typing import List, Dict
+
 import torch
 import torch.nn as nn
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from torchvision.models.detection.roi_heads import RoIHeads
 
 # Custom RoIHeads with Focal Loss for classification
 class RoIHeadsWithFocalLoss(RoIHeads):

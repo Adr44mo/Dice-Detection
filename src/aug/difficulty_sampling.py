@@ -132,7 +132,6 @@ class DifficultyAwareSampler(Sampler):
         samples_per_epoch: int = None,
         difficulty_weight: float = 0.5,
         difficulty_weights: Dict[str, float] = None,
-        balance_by: str = 'dice_value'
     ):
         """
         Args:
@@ -141,12 +140,10 @@ class DifficultyAwareSampler(Sampler):
             difficulty_weight: Weight for difficulty vs class balance (0-1)
                 0 = pure class balance, 1 = pure difficulty
             difficulty_weights: Weights for difficulty calculation components
-            balance_by: How to balance ('dice_value' for dice faces)
         """
         self.dataset = dataset
         self.samples_per_epoch = samples_per_epoch or len(dataset)
         self.difficulty_weight = difficulty_weight
-        self.balance_by = balance_by
         self.difficulty_calc_weights = difficulty_weights
         
         # Build difficulty and class indices

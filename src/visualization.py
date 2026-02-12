@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 import torch
-from PIL import Image
 from typing import Dict, List, Optional, Tuple
+
 import seaborn as sns
 
 

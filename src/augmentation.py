@@ -1,33 +1,21 @@
-"""
-Data augmentation techniques for dice detection.
-"""
-
 import random
-import numpy as np
 import torch
 from torch.utils.data import Sampler, Dataset
-from PIL import Image, ImageDraw
+from PIL import Image
 import torchvision.transforms.functional as F
 from typing import List, Tuple, Dict
 
 class ClassAwareSampler(Sampler):
-    """Sampler that balances classes during training."""
-    
+    """Sampler that oversamples under-represented classes."""
+
     def __init__(
-        self, 
-        dataset: Dataset, 
+        self,
+        dataset: Dataset,
         samples_per_epoch: int = None,
-        balance_by: str = 'dice_value'  # 'dice_value' or 'num_dices'
     ):
-        """
-        Args:
-            dataset: Dataset with get_class_distribution method
-            samples_per_epoch: Number of samples per epoch (default: len(dataset))
-            balance_by: How to balance ('dice_value' for dice faces, 'num_dices' for count)
-        """
+        """Build the sampler for a dataset that yields torchvision-style targets."""
         self.dataset = dataset
         self.samples_per_epoch = samples_per_epoch or len(dataset)
-        self.balance_by = balance_by
         
         # Build indices for each class
         self.class_indices = self._build_class_indices()

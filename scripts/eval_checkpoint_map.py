@@ -43,13 +43,7 @@ DEVICE = None  # Set to "cuda"/"cpu" to override auto-selection
 
 
 def infer_num_classes_from_checkpoint(checkpoint_path: str) -> int:
-    """Return the classifier output dimension (including background).
-
-    This inspects the saved `roi_heads.box_predictor.cls_score.weight` tensor
-    so evaluation can instantiate a model whose head matches the checkpoint
-    even when the dataset metadata differs.
-    (used for Loss and Gan)
-    """
+    """Return the classifier output dimension (including background)."""
 
     checkpoint = torch.load(checkpoint_path, map_location="cpu")
     state_dict = checkpoint.get("model_state_dict", checkpoint)
