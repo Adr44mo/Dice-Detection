@@ -1,12 +1,3 @@
-"""
-GAN (Generative Adversarial Network) module for synthetic dice image generation.
-
-This module contains the conditional DCGAN architecture and utilities for:
-- Training GANs on dice crops
-- Generating synthetic dice images
-- Creating full COCO-formatted scenes with bounding box annotations
-"""
-
 import os
 import json
 import random
@@ -228,30 +219,6 @@ def create_synthetic_coco_dataset(
     original_image_dir=None,
     split='train'
 ):
-    """
-    Generate a complete COCO-format dataset with synthetic dice scenes.
-    Can optionally merge with existing annotations and avoid overlapping with existing dice.
-    
-    Args:
-        generator: Trained Generator model
-        background_dir: Directory with background images
-        output_dir: Directory to save synthetic dataset
-        config: Configuration dict with keys:
-            - scene_size: Tuple (width, height) for output scenes
-            - dice_size_range: Tuple (min_size, max_size) for dice
-            - dice_per_image: Tuple (min_dice, max_dice) per scene
-            - num_images: Number of scenes to generate
-            - merge_with_original: If True, merge with original annotations
-        device: Torch device
-        class_counts: Dict of current class counts to balance (optional)
-        latent_dim: Dimension of latent noise vector
-        original_annotations: Original COCO annotations to merge with (optional)
-        original_image_dir: Directory with original images (optional)
-        split: Split name ('train', 'val', 'test') for subdirectory
-        
-    Returns:
-        Dictionary with 'images', 'annotations', and 'categories' generated
-    """
     os.makedirs(os.path.join(output_dir, split), exist_ok=True)
     os.makedirs(os.path.join(output_dir, 'annotations'), exist_ok=True)
     
@@ -475,7 +442,7 @@ def create_synthetic_coco_dataset(
     with open(annotation_path, 'w') as f:
         json.dump(coco_data, f, indent=2)
     
-    print(f"\n✅ Generated dataset with {len(coco_images)} total images and {len(coco_annotations)} total annotations")
+    print(f"\n Generated dataset with {len(coco_images)} total images and {len(coco_annotations)} total annotations")
     print(f"   Annotations saved to: {annotation_path}")
     print(f"\nSynthetic dice added per class:")
     for k, v in generated_per_class.items():

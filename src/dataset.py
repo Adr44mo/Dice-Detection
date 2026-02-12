@@ -1,7 +1,3 @@
-"""
-Dataset handling for dice detection
-Supports loading from Roboflow and local datasets
-"""
 
 import os
 import json
